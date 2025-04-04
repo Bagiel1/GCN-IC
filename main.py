@@ -9,12 +9,12 @@ from PIL import Image
 import umap.umap_ as umap
 from sklearn.manifold import TSNE
 
-# Carrega as features e a lista de imagens
+
 features = np.load('features.npy')
 with open('list.txt', 'r') as file:
     dataset_elements = [line.strip() for line in file.readlines()]
 
-# Cria a Ball Tree para obter os rankings
+
 def run_ball_tree(features, k=100):
     if not isinstance(features, np.ndarray):
         raise ValueError('As features devem estar em numpy')
@@ -30,7 +30,7 @@ print(f'Número de imagens: {len(dataset_elements)}')
 class_size = 80
 labels = [i // class_size for i in range(len(dataset_elements))]
 
-# Cria os folds para validação
+
 def fold_split(features, labels, n_folds=10):
     from sklearn.model_selection import StratifiedKFold
     kf = StratifiedKFold(n_splits=n_folds, shuffle=False)
@@ -38,7 +38,7 @@ def fold_split(features, labels, n_folds=10):
 
 folds = fold_split(features, labels, n_folds=10)
 
-# Funções de visualização
+
 def plot_tsne(features, labels=None, perplexity=30, n_components=2, learning_rate=200, n_iter=1000):
     from sklearn.manifold import TSNE
     tsne = TSNE(n_components=n_components, learning_rate=learning_rate, perplexity=perplexity, n_iter=n_iter)
@@ -80,7 +80,7 @@ def plot_umap(features, labels=None, n_neighbors=15, min_dist=0.1, n_components=
     plt.title('UMAP Projection', fontsize=18)
     plt.show()
 
-# Funções de ranking de imagens
+
 def build_ranked_paths(imgs_dir, dataset_elements, rankings, query, top_n=15):
     return [os.path.join(imgs_dir, dataset_elements[img]) for img in rankings[query][:top_n]]
 
@@ -103,15 +103,31 @@ def display_rk(image_paths_before, image_paths_after):
     plt.tight_layout()
     plt.show()
 
+from gcn_base import GCNClassifier
+
 if __name__ == "__main__":
-    # Exemplo de visualizações
-    # plot_tsne(features, labels)
-    # plot_umap(features, labels)
+
+    test_index, train_index= folds[0]
+
+    clf= GCNClassifier('gcn-net', rks, len(labels), number_neighbors=40)
+    clf.prepare(test_index, train_index, features, labels)
+    embeddings, pred= clf.train_and_predict()
+
+    embeddings= embeddings.detach().numpy()
+
+    test_labels= [labels[i] for i in test_index]
+    acc= sum(1 for i, p in enumerate(pred) if test_labels[i] == p) / len(pred)
+    print(f'Acurracy: {acc*100:.2f}%')
+    
+    plot_tsne(features, labels)
+    plot_tsne(embeddings, labels)
+    plot_umap(features, labels)
+    plot_umap(embeddings, labels)
+
     imgs_dir = os.path.join(os.getcwd(), 'content', 'extracted', 'jpg')
     query = 1000
     rk_before = build_ranked_paths(imgs_dir, dataset_elements, rks, query)
-    # Para exemplo, criamos uma nova BallTree a partir de embeddings
-    # Suponha que "embeddings" já foram obtidos; aqui apenas reutilizamos rks para o exemplo.
-    new_rks = run_ball_tree(features, k=100)
+
+    new_rks = run_ball_tree(embeddings, k=100)
     rk_after = build_ranked_paths(imgs_dir, dataset_elements, new_rks, query)
     display_rk(rk_before, rk_after)

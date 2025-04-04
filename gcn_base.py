@@ -3,19 +3,16 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
+from torch_geometric.nn import SGConv
 
-class Net(torch.nn.Module):
-    def __init__(self, pNFeatures, pNNeurons, numberOfClasses):
-        super(Net, self).__init__()
-        self.conv1 = GCNConv(pNFeatures, pNNeurons)
-        self.conv2 = GCNConv(pNNeurons, numberOfClasses)
+class SGC(torch.nn.Module):
+    def __init__(self, num_features, num_classes):
+        super(SGC, self).__init__()
+        self.conv1 = SGConv(num_features, num_classes, K=2, cached=True)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
         x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training)
-        x = self.conv2(x, edge_index)
         return F.log_softmax(x, dim=1)
 
 class GCNClassifier:
@@ -23,7 +20,6 @@ class GCNClassifier:
         self.pK = number_neighbors
         self.pN = pN
         self.rks = rks
-        print(self.rks)
         self.pLR = 0.001
         self.pNNeurons = 32
         self.pNEpochs = 50
@@ -82,7 +78,7 @@ class GCNClassifier:
         print('Loading data object...')
         data = Data(x=self.x.float(), edge_index=self.edge_index, y=self.y, 
                     test_mask=self.test_mask, train_mask=self.train_mask, val_mask=self.val_mask)
-        model = Net(self.pNFeatures, self.pNNeurons, self.numbersOfClasses)
+        model = SGC(self.pNFeatures, self.numbersOfClasses)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.pLR, weight_decay=5e-4)
 
         print('Training')   

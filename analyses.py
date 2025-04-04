@@ -8,7 +8,7 @@ def experiment_jaccard_thresholds(classifier, thresholds, test_index, train_inde
     accurracies = {}
     for limiar in thresholds:
         print(f'\nExperimentando com limiar: {limiar}')
-        classifier.prepare(test_index, train_index, features, labels)
+        classifier.prepare(test_index, train_index, features, labels, analy=True)
         classifier.create_graph('jaccard', limiar=limiar)
         embeddings, pred = classifier.train_and_predict()
         test_labels = [labels[i] for i in test_index]
