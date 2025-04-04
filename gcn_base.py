@@ -25,7 +25,7 @@ class GCNClassifier:
         self.pNEpochs = 50
         self.gcn_type = gcn_type
 
-    def prepare(self, test_index, train_index, features, labels):
+    def prepare(self, test_index, train_index, features, labels, analy=False):
         print('Creating Masks...')
         self.train_mask = [False] * self.pN
         self.val_mask = [False] * self.pN
@@ -48,7 +48,50 @@ class GCNClassifier:
         self.x = torch.tensor(features)
         self.pNFeatures = len(features[0])
 
-        self.create_graph('jaccard')
+        if analy == False:
+            self.create_graph('jaccard')
+
+    def compute_RBO(self, rks, top_k, limiar):
+        edge_index= []
+        r= 0.9
+        for z in range(len(rks)):
+            for p in range(len(rks)):
+                stored= set()
+                acum_inter= 0
+                score= 0
+                img1_leftover= set()
+                img2_leftover= set()
+
+                for i in range(top_k):
+                    img1_elm= rks[z][i]
+                    img2_elm= rks[p][i]
+
+                    if img1_elm not in stored and img1_elm == img2_elm:
+                        acum_inter += 1
+                        stored.add(img1_elm)
+                    else:
+                        if img1_elm not in stored:
+                            if img1_elm in img2_leftover:
+                                acum_inter += 1
+                                stored.add(img1_elm)
+                                img2_leftover.remove(img1_elm)
+                            else:
+                                img1_leftover.add(img1_elm)
+                        if img2_elm not in stored:
+                            if img2_elm in img1_leftover:
+                                acum_inter += 1
+                                stored.add(img2_elm)
+                                img1_leftover.remove(img2_elm)
+                            else:
+                                img2_leftover.add(img2_elm)
+                    score += (r**((i+1)-1)) * (acum_inter / (i+1))
+                scrN= (1-r) * score
+                
+                if scrN >= limiar:
+                    edge_index.append([z,p])
+
+        edge_index= torch.tensor(edge_index)
+        self.edge_index= edge_index.t().contiguous()
 
     def compute_jaccard(self, rks, top_k, limiar):
         edge_index = []
@@ -72,7 +115,9 @@ class GCNClassifier:
             edge_index = torch.tensor(edge_index)
             self.edge_index = edge_index.t().contiguous()
         if correlation_measure == 'jaccard':
-            self.compute_jaccard(self.rks, 100, limiar)
+            self.compute_jaccard(self.rks, self.pK, limiar)
+        if correlation_measure == 'RBO':
+            self.compute_RBO(self.rks, self.pK, limiar)
 
     def train_and_predict(self):
         print('Loading data object...')
@@ -84,7 +129,7 @@ class GCNClassifier:
         print('Training')   
         model.train()
         for epoch in range(self.pNEpochs):
-            print(f'Training epoch: {epoch}')
+            #print(f'Training epoch: {epoch}')
             optimizer.zero_grad()
             out = model(data)
             data.y = torch.tensor(data.y, dtype=torch.long)

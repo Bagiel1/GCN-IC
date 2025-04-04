@@ -74,16 +74,12 @@ def processamento(model, imgs_path):
     return features, dataset_elements
 
 if __name__ == "__main__":
-    # Exemplo de uso: descomente as linhas abaixo para realizar o download e extração.
-    # download_dataset(url, download_path)
-    # extract_tgz(download_path, extract_path)
 
-    # Inicializa o modelo
     model_name = 'alexnet'
     model = pretrainedmodels.__dict__[model_name](num_classes=1000, pretrained='imagenet')
     model.eval()
     model.last_linear = pretrainedmodels.utils.Identity()
 
     imgs_path = os.path.join(download_dir, 'extracted', 'jpg')
-    # Chama o processamento para extrair features
+
     processamento(model, imgs_path)
